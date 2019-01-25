@@ -1,13 +1,14 @@
 # getver-format
 
-A wrapper around the excellent Rust tool [getver](https://github.com/phynalle/getver) to format output for use in a `Cargo.toml` crate manifest. Written in Python.
+A wrapper around the excellent Rust tool **[getver](https://github.com/phynalle/getver)** to format output for use in a `Cargo.toml` crate manifest. Written in Python.
+
+`getver` will always pull the latest version number available, so this is most useful when adding a new dependency to a crate.
 
 ## Requirements
 
  * Python 3.5+
  * `getver` must be installed. Follow the [README](https://github.com/phynalle/getver/blob/master/README.md) for instructions
- * The folder containing `getver` must be in your `PATH` environment variable
-   + A future version will have support for specifying the folder on the command line
+ * The folder containing `getver` **must be** in your `PATH` environment variable
 
 ## Usage
 
@@ -27,7 +28,26 @@ chrono = "0.4.6"
 fomat-macros = "0.2.1"
 ```
 
-Note that the output order is not necessarily the same as the input order, as `getver` returns a version number for each crate as soon as it can. A future version may support output order matching input, as well as alphabetical sorting.
+`getver` will alert you if a crate cannot be found:
+
+```
+$ python3 getver-format.py alice bob num
+the crate 'bob' doesn't exist
+num = "0.2.0"
+the crate 'alice' doesn't exist
+```
+
+Note that the output order is not necessarily the same as the input order, as `getver` returns a version number for each crate as soon as it can.
+
+## Future
+
+Planned additions include:
+ * Support for specifying the folder or full path to `getver` on the command line
+ * Optional matching output order to input
+ * Optional alphabetical sorting
+ * Listing missing crates separately
+ * Suppressing missing crate warnings if desired
+
 
 ## License
 
