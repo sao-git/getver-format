@@ -47,7 +47,11 @@ Planned additions include:
  * Optional alphabetical sorting
  * Listing missing crates separately
  * Suppressing missing crate warnings if desired
+ * Add option for suppressing the **[semver][semver]** [patch version][semver-patch] (as in `MAJOR.MINOR.PATCH`) in the output
+     + Alternatively, and more likely, make this the default behavior and have the option for *showing* the patch number
 
+[semver]: https://semver.org/ "Semantic Versioning"
+[semver-patch]: https://semver.org/#spec-item-6 "Semantic Versioning Specification, item 6: Patch version"
 
 ## License
 
