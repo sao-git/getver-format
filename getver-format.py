@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __title__ = 'getver-format'
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 __license__ = 'MIT'
 __desc__ = (
     'Formatter for copying latest versions of Rust crates to a Cargo manifest, using "getver" crate version fetcher')
@@ -9,16 +9,14 @@ __url__ = 'https://github.com/sao-git/getver-format'
 
 
 import subprocess
-#import sys
+from sys import stderr
 import re
 import argparse
 
 
 def parse_args():
     """ Set up, and return the results of, the argument parser. """
-    parser = argparse.ArgumentParser(
-        add_help=True, prog=__title__)
-        #usage='%(prog)s [options] [logging] network|ALL')
+    parser = argparse.ArgumentParser(add_help=True, prog=__title__)
 
     parser.add_argument('crates', metavar='CRATE', type=str, nargs='+',
                         help='a list of Cargo crates')
@@ -66,15 +64,25 @@ if __name__ == '__main__':
     # and "not found" contains items of the format `'name'`
     crates_found, crates_not_found = get_crate_lists(output_clean)
 
-    # By default, remove the semver patch version number from the output
-    if not args.show_patch:
-        crates_found = [[name, '.'.join(version.split('.')[:2])] for name, version in crates_found]
+    found_len = len(crates_found)
+    not_found_len = len(crates_not_found)
 
-    # Format found crates into a newline-separated string of
-    # `name = "version"`
-    crates_found_str = '\n'.join(f'{name} = "{version}"' for name, version in crates_found)
-    crates_not_found_str = '\n'.join(crates_not_found)
+    if found_len != 0:
+        # By default, remove the semver patch version number from the output
+        if not args.show_patch:
+            crates_found = [[name, '.'.join(version.split('.')[:2])] for name, version in crates_found]
 
-    #print(output_format, end = '')
+        # Format "found" crates into a newline-separated string of
+        # `name = "version"`
+        crates_found_str = '\n'.join(f'{name} = "{version}"' for name, version in crates_found)
+        print(crates_found_str)
 
-    print(f"{crates_found_str}\n\nThe following crates were not found:\n{crates_not_found_str}")
+    # Print a list of "not found" crates in alphabetical order
+    if not_found_len != 0:
+        crates_not_found.sort()
+        crates_not_found_str = '\n'.join(crates_not_found)
+        if found_len != 0:
+            sep = '\n'
+        else:
+            sep = ''
+        print(f"{sep}The following crates were not found:\n{crates_not_found_str}", file=stderr)
