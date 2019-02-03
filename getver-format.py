@@ -86,7 +86,7 @@ if __name__ == '__main__':
     # This is safe because `input_clean` will not be used after the final
     # lists are created.
     input_clean: Dict[str, Any]
-    input_clean = OrderedDict.fromkeys(re.sub('_', '-', s) for s in args.crates)
+    input_clean = OrderedDict.fromkeys(s.replace('_', '-') for s in args.crates)
 
     # Run `getver` with the cleaned input list
     #
