@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __title__ = 'getver-format'
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 __license__ = 'MIT'
 __desc__ = (
     'Formatter for copying latest versions of Rust crates to a Cargo manifest, using "getver" crate version fetcher')
@@ -13,7 +13,8 @@ from sys import stderr
 import re
 import argparse
 from collections import OrderedDict
-from typing import List, Tuple, Dict, Generator
+from typing import List, Tuple, Dict, Iterable, Any
+
 
 def parse_args() -> argparse.Namespace:
     """ Set up, and return the results of, the argument parser. """
@@ -29,11 +30,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_crate_lists(input_list: List, output_clean: str, show_patch: bool) -> Tuple[List, List]:
-    raw_crates: List[str] = output_clean.splitlines()
-    split_crates: Generator[List[str], None, None] = (s.split(': ') for s in raw_crates)
+def get_crate_lists(input_clean: Dict[str, Any],
+                    output_clean: str,
+                    show_patch: bool) -> Tuple[List, List]:
+    """
+    Parses the output of `getver` into a tuple of two lists:
 
-    crates_found: Dict[str, str] = OrderedDict.fromkeys(input_list)
+        The first list contains the found crates, of type `List[Tuple[str, str]]`.
+        The first element in the tuple is the name of the crate,
+        the second element is the latest version number in crates.io
+        This list is sorted according to the input list.
+
+        The second list contains the missing crates, of type `List[str]`.
+        This list is sorted alphabetically.
+    """
+
+    raw_crates: List[str] = output_clean.splitlines()
+
+    split_crates: Iterable[List[str]]
+    split_crates = (s.split(': ') for s in raw_crates)
+
     crates_not_found: List[str] = []
 
     for n in split_crates:
@@ -41,19 +57,20 @@ def get_crate_lists(input_list: List, output_clean: str, show_patch: bool) -> Tu
         if potential_name.find("doesn't exist") != -1:
             name_not_found: str = potential_name.split("'")[1]
             crates_not_found.append(name_not_found)
-            del crates_found[name_not_found]
+            del input_clean[name_not_found]
         else:
             found_version: str = n[1]
-            crates_found[potential_name] = found_version
+            input_clean[potential_name] = found_version
 
 
     crates_found_out: List[Tuple[str, str]]
     if not show_patch:
         crates_found_out = [(name, '.'.join(version.split('.')[:2]))
-                for name, version in crates_found.items()]
+                for name, version in input_clean.items()]
     else:
         crates_found_out = [(name, version)
-                for name, version in crates_found.items()]
+                for name, version in input_clean.items()]
+
 
     return crates_found_out, crates_not_found
 
@@ -61,10 +78,23 @@ def get_crate_lists(input_list: List, output_clean: str, show_patch: bool) -> Tu
 if __name__ == '__main__':
     args: argparse.Namespace = parse_args()
 
-    # Expects `getver` to be in $PATH or %PATH%
+    # Replace underscores (U+005F) in the input list with hyphens (U+002D),
+    # then remove duplicate names from the list.
+    #
+    # `input_clean` will be mutated in `get_crate_lists()`, which will delete
+    # missing crates from the dict and append version numbers to the found keys.
+    # This is safe because `input_clean` will not be used after the final
+    # lists are created.
+    input_clean: Dict[str, Any]
+    input_clean = OrderedDict.fromkeys(re.sub('_', '-', s) for s in args.crates)
+
+    # Run `getver` with the cleaned input list
+    #
+    # Expects `getver` to be in PATH environment variable
     # TODO:
     #       Add command line option to pass in path to `getver`
-    command: List[str] = ["getver"] + args.crates
+    command: List[str]
+    command = ["getver"] + list(input_clean.keys())
 
     getver_proc: subprocess.CompletedProcess
     getver_proc = subprocess.run(args = command,
@@ -76,12 +106,13 @@ if __name__ == '__main__':
     ansi_color_match = r'\x1B\[[0-?]*[ -/]*[@-~]'
     output_clean: str = re.sub(ansi_color_match, '', getver_proc.stdout)
 
+
     # Parse the cleaned output into "found" and "not found" lists,
     # where "found" contains items of the format `('name', 'version')`
     # and "not found" contains items of the format `'name'`
     crates_found: List[Tuple[str, str]]
     crates_not_found: List[str]
-    crates_found, crates_not_found = get_crate_lists(args.crates,
+    crates_found, crates_not_found = get_crate_lists(input_clean,
                                                      output_clean,
                                                      args.show_patch)
 
@@ -108,4 +139,4 @@ if __name__ == '__main__':
         else:
             sep = ''
 
-        print(f"{sep}The following crates were not found:\n{not_found_formatted}", file=stderr)
+        print(f"{sep}These were not found on crates.io:\n{not_found_formatted}", file=stderr)
