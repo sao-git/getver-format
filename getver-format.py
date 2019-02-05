@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __title__ = 'getver-format'
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 __license__ = 'MIT'
 __desc__ = (
     'Formatter for copying latest versions of Rust crates to a Cargo manifest, using "getver" crate version fetcher')
@@ -18,20 +18,41 @@ from typing import List, Tuple, Dict, Iterable, Any, Pattern, Optional, Sequence
 
 def parse_args() -> argparse.Namespace:
     """ Set up, and return the results of, the argument parser. """
-    parser = argparse.ArgumentParser(add_help=True, prog=__title__)
 
-    parser.add_argument('crates', metavar='CRATE', type=str, nargs='+',
+    ver_string = f'%(prog)s {__version__}'
+    desc = ver_string + '\nPrint a list of the latest Rust crate versions from crates.io'
+
+    parser = argparse.ArgumentParser(add_help=True,
+                                     prog=__title__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description=desc)
+
+    parser.add_argument('-V', '--version',
+                        action='version',
+                        version=ver_string,
+                        help='print the program version')
+
+    parser.add_argument('crates',
+                        metavar='CRATE',
+                        type=str,
+                        nargs='+',
                         help='a list of Cargo crates')
+
+    parser.add_argument('-g', '--getver-path',
+                        metavar='PATH',
+                        dest='getver_path',
+                        default='getver',
+                        help='path to getver')
 
     parser.add_argument('-p', '--show-patch',
                         dest='show_patch',
                         action='store_true',
                         help='show semver patch versions')
 
-    parser.add_argument('-g', '--getver-path',
-                        dest='getver_path',
-                        default='getver',
-                        help='show semver patch versions')
+    parser.add_argument('-n', '--no-missing-crates',
+                        dest='hide_missing',
+                        action='store_true',
+                        help='do not show missing crates in the output')
 
     return parser.parse_args()
 
@@ -194,7 +215,7 @@ if __name__ == '__main__':
         print(found_formatted)
 
     # Print a list of "not found" crates in alphabetical order
-    if not_found_len != 0:
+    if not args.hide_missing and not_found_len != 0:
         crates_not_found.sort()
         not_found_formatted: str = '\n'.join(crates_not_found)
 
