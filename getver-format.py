@@ -160,7 +160,7 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
     if major >= 0 and minor >= 1 and patch >= 0:
         return semver_groups[1]
     else:
-        raise ValueError()
+        raise ValueError(version_error)
 
 
 if __name__ == '__main__':
