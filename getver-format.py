@@ -54,11 +54,18 @@ def parse_args() -> argparse.Namespace:
                         action='store_true',
                         help='do not show missing crates in the output')
 
+    parser.add_argument('-a', '--sort-alphabet',
+                        dest='sort_alpha',
+                        action='store_true',
+                        help='sort the list of crates alphabetically')
+
+
     return parser.parse_args()
 
 
 def get_crate_lists(input_clean: Dict[str, Any],
                     output_clean: str,
+                    sort_alpha: bool,
                     show_patch: bool) -> Tuple[List, List]:
     """
     Parses the output of `getver` into a tuple of two lists:
@@ -97,6 +104,9 @@ def get_crate_lists(input_clean: Dict[str, Any],
     else:
         crates_found_out = [(name, version)
                 for name, version in input_clean.items()]
+
+    if sort_alpha:
+        crates_found_out.sort(key=lambda crate: crate[0])
 
 
     return crates_found_out, crates_not_found
@@ -199,6 +209,7 @@ if __name__ == '__main__':
     crates_not_found: List[str]
     crates_found, crates_not_found = get_crate_lists(input_clean,
                                                      output_clean,
+                                                     args.sort_alpha,
                                                      args.show_patch)
 
     found_len: int = len(crates_found)
