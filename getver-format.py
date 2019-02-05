@@ -79,11 +79,22 @@ def get_crate_lists(input_clean: Dict[str, Any],
         This list is sorted alphabetically.
     """
 
-    raw_crates: List[str] = output_clean.splitlines()
+    # Make a list out of the cleaned input, one item for each line
+    raw_crates: Iterable[str] = output_clean.splitlines()
 
+    # Separate found crate strings `'name: version'` into lists `['name', 'version']`
+    # Missing crate strings will not be affected
     split_crates: Iterable[List[str]]
     split_crates = (s.split(': ') for s in raw_crates)
 
+    # For each item in `split_crates`, attempt to find missing crate strings
+    # of the form `"the crate 'crate-not-found' doesn't exist"`, splitting by `'`
+    #
+    # If the split succeeds, add the name (index 1 of the `split()` list) to the
+    # "not found" list and remove the name from the input dictionary
+    #
+    # If it doesn't, assume the crate was found and has a corresponding version
+    # number and add the number to the corresponding dictionary entry
     crates_not_found: List[str] = []
 
     for n in split_crates:
@@ -97,6 +108,10 @@ def get_crate_lists(input_clean: Dict[str, Any],
             input_clean[potential_name] = found_version
 
 
+    # Create the "found" output list and format according to user preferences
+    #
+    # The default is to remove the SemVer patch version number from the output
+    # and keep the output in the same order as the input
     crates_found_out: List[Tuple[str, str]]
     if not show_patch:
         crates_found_out = [(name, '.'.join(version.split('.')[:2]))
@@ -113,9 +128,16 @@ def get_crate_lists(input_clean: Dict[str, Any],
 
 
 def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
+    """ Check for a valid version of getver """
+
+    # Strings to supply to the ValueError exception
     not_found_error = "Can't find getver at the provided path"
     version_error = "Requires getver version >= 0.1.0"
 
+    # Pass `--help` to `getver` to get the version number
+    #
+    # This mutates the provided path list, so remove `--help` once the
+    # subprocess exits
     path.append('--help')
     getver_version: subprocess.CompletedProcess
     getver_version = subprocess.run(args = path,
@@ -123,11 +145,23 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
                                     text = True)
     del path[-1]
 
+    # Split the output of the subprocess by lines and attempt to find
+    # the string `'getver'` in the resulting list.
     potentially: Iterable[str]
     potentially = ansi_pattern.sub('', getver_version.stdout).splitlines()
     potentially = (s.strip() for s in potentially if s.find('getver') != -1)
 
+    # If the generator is empty (meaning the string was not found in the list)
+    # calling `next()` should return `None`. If not, it should return the string
+    # containing `'getver'` and the version number
     getverver: Optional[str] = next(potentially, None)
+
+    # If no string was returned (the `None` variant of the `Optional` type),
+    # then abort with the Not Found error.
+    #
+    # Else, split the string by spaces and get the second element (index 1)
+    # which should be the semantic version string. If this fails, also abort
+    # with the Not Found error.
     version_string: str
     if getverver is None:
         raise ValueError(not_found_error)
@@ -138,9 +172,10 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
             raise ValueError(not_found_error)
 
 
-    # https://regexr.com/39s32
+    # Match the version string against the SemVer regex from https://regexr.com/39s32
     #
-    # Capture group indices:
+    # The capture group indices are:
+    #
     # 0. The whole version string
     # 1. MAJOR.MINOR.PATCH-PRE_RELEASE (what you should be evaluating for precendence)
     # 2. MAJOR
@@ -148,6 +183,8 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
     # 4. PATCH
     # 5. PRERELEASE
     # 6. BUILD_METADATA
+    #
+    # If the match fails, it should return `None`, so abort with the Not Found error
     semver_match: Optional[Match[str]]
     semver_groups: Sequence[str]
     semver_match = re.match(r'^((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)$', version_string)
@@ -156,6 +193,12 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
     else:
         semver_groups = semver_match.groups()
 
+    # Check the version match groups for >= 0.1.0
+    # If this succeeds, return the version string
+    # If this fails, abort with the Wrong Version error
+    #
+    # Note: This is a simple check for now. It should not be interpreted
+    # as a caret requirement (as in ^0.1.0)
     major, minor, patch = (int(s) for s in semver_groups[2:5])
     if major >= 0 and minor >= 1 and patch >= 0:
         return semver_groups[1]
@@ -166,7 +209,7 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
 if __name__ == '__main__':
     args: argparse.Namespace = parse_args()
 
-    # https://stackoverflow.com/a/14693789
+    # ANSI escape sequence regex from https://stackoverflow.com/a/14693789
     ansi_color_match: Pattern[str]
     ansi_color_match = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -180,7 +223,7 @@ if __name__ == '__main__':
         exit(1)
 
     # Replace underscores (U+005F) in the input list with hyphens (U+002D),
-    # then remove duplicate names from the list.
+    # then remove duplicate names from the list and keep the resulting order.
     #
     # `input_clean` will be mutated in `get_crate_lists()`, which will delete
     # missing crates from the dict and append version numbers to the found keys.
@@ -189,7 +232,7 @@ if __name__ == '__main__':
     input_clean: Dict[str, Any]
     input_clean = OrderedDict.fromkeys(s.replace('_', '-') for s in args.crates)
 
-    # Run `getver` with the cleaned input list
+    # Run `getver` with the cleaned input list and capture the output
     run_command: List[str]
     run_command = gv_path + list(input_clean.keys())
 
@@ -212,12 +255,12 @@ if __name__ == '__main__':
                                                      args.sort_alpha,
                                                      args.show_patch)
 
-    found_len: int = len(crates_found)
-    not_found_len: int = len(crates_not_found)
+    # These will be used to determine what to output
+    found: bool = len(crates_found) != 0
+    not_found: bool = len(crates_not_found) != 0
 
-    if found_len != 0:
-        # By default, remove the semver patch version number from the output
-
+    # Print the list of "found" crates
+    if found:
         # Format "found" crates into a newline-separated string of
         # `name = "version"`
         found_formatted: str = '\n'.join(f'{name} = "{version}"'
@@ -225,12 +268,12 @@ if __name__ == '__main__':
 
         print(found_formatted)
 
-    # Print a list of "not found" crates in alphabetical order
-    if not args.hide_missing and not_found_len != 0:
+    # Print the list of "not found" crates to stderr in alphabetical order
+    if not args.hide_missing and not_found:
         crates_not_found.sort()
         not_found_formatted: str = '\n'.join(crates_not_found)
 
-        if found_len != 0:
+        if found:
             sep = '\n'
         else:
             sep = ''
