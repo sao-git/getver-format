@@ -145,7 +145,7 @@ if __name__ == '__main__':
     try:
         gv_version = check_version(gv_path, ansi_color_match)
     except ValueError as e:
-        print(f'Error: {e}', file=stderr)
+        print(f'getver-format: error: {e}', file=stderr)
         exit(1)
 
     # Replace underscores (U+005F) in the input list with hyphens (U+002D),
