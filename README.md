@@ -2,13 +2,12 @@
 
 A wrapper around the excellent Rust tool **[getver](https://github.com/phynalle/getver)** to format output for use in a `Cargo.toml` crate manifest. Written in Python.
 
-`getver` will always pull the latest version number of a crate from [crates.io][crates-io], so this is most useful when adding a new dependency to a project.
+`getver` will always pull the latest version number of a crate from [crates.io][crates-io], so this is most useful when adding a new dependency to a project or upgrading a prior dependency.
 
 ## Requirements
 
  * Python 3.5+
- * `getver` must be installed. Follow the [README](https://github.com/phynalle/getver/blob/master/README.md) for instructions
- * The folder containing `getver` **must be** in your `PATH` environment variable
+ * `getver` must be installed. See the [README](https://github.com/phynalle/getver/blob/master/README.md) for instructions
 
 ## Usage
 
@@ -17,8 +16,10 @@ A wrapper around the excellent Rust tool **[getver](https://github.com/phynalle/
 Give a list of crate names on the command line, just like `getver`:
 
 ```
-$ python getver-format.py toml fomat_macros chrono cached rayon
+$ python getver-format.py toml fomat_macros chrono cached rayon error-chain
 ```
+
+A name can be listed with either an underscore or a hyphen, and the output will always use hyphens. The order of the output will match the list given.
 
 The output is ready to copy and paste into your `Cargo.toml`:
 
@@ -28,6 +29,7 @@ fomat-macros = "0.2"
 chrono = "0.4"
 cached = "0.8"
 rayon = "1.0"
+error-chain = "0.12"
 ```
 
 ### Showing patch version
@@ -35,12 +37,13 @@ rayon = "1.0"
 If you want to show the **[semver][semver]** [patch version][semver-patch] (as in `MAJOR.MINOR.PATCH`) in the output, add `-p` or `--show-patch`:
 
 ```
-$ python getver-format.py -p toml fomat_macros chrono cached rayon
+$ python getver-format.py -p toml fomat_macros chrono cached rayon error-chain
 toml = "0.4.10"
 fomat-macros = "0.2.1"
 chrono = "0.4.6"
 cached = "0.8.0"
 rayon = "1.0.3"
+error-chain = "0.12.0"
 ```
 
 ### Missing crates
