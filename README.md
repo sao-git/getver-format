@@ -24,15 +24,11 @@ The output is ready to copy and paste into your `Cargo.toml`:
 
 ```
 toml = "0.4"
-cached = "0.8"
-chrono = "0.4"
-rayon = "1.0"
 fomat-macros = "0.2"
+chrono = "0.4"
+cached = "0.8"
+rayon = "1.0"
 ```
-
-#### Note on output order
-The output is not necessarily in the same order as the input, as `getver` returns a version number for each crate as soon as it can. **This will change in the future.**
-
 
 ### Showing patch version
 
@@ -40,11 +36,11 @@ If you want to show the **[semver][semver]** [patch version][semver-patch] (as i
 
 ```
 $ python getver-format.py -p toml fomat_macros chrono cached rayon
+toml = "0.4.10"
 fomat-macros = "0.2.1"
 chrono = "0.4.6"
 cached = "0.8.0"
 rayon = "1.0.3"
-toml = "0.4.10"
 ```
 
 ### Missing crates
@@ -89,10 +85,9 @@ getver-format: error: the following arguments are required: CRATE
 ## Future
 
 Planned additions include:
- * Ability to specify the full path to `getver`
- * Matching order of the output to the input
  * Optional alphabetical sorting for the output
  * Suppressing missing crate warnings if desired
+ * Proper changelog as a Markdown file linked from this README 
 
 ## License
 
