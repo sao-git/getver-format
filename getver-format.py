@@ -9,6 +9,7 @@ __url__ = 'https://github.com/sao-git/getver-format'
 
 
 import subprocess
+from os import environ
 from sys import stderr, exit
 import re
 import argparse
@@ -41,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('-g', '--getver-path',
                         metavar='PATH',
                         dest='getver_path',
-                        default='getver',
+                        default=None,
                         help='path to getver')
 
     parser.add_argument('-p', '--show-patch',
@@ -128,7 +129,7 @@ def get_crate_lists(input_clean: Dict[str, Any],
 
 
 def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
-    """ Check for a valid version of getver """
+    """ Check for a valid version of `getver`. """
 
     # Strings to supply to the ValueError exception
     not_found_error = "Can't find getver at the provided path"
@@ -145,8 +146,8 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
                                     text = True)
     del path[-1]
 
-    # Split the output of the subprocess by lines and attempt to find
-    # the string `'getver'` in the resulting list.
+    # Remove ANSI escape codes from the subprocess output, split the output
+    # by lines and attempt to find the string `'getver'` in the resulting list
     potentially: Iterable[str]
     potentially = ansi_pattern.sub('', getver_version.stdout).splitlines()
     potentially = (s.strip() for s in potentially if s.find('getver') != -1)
@@ -193,31 +194,58 @@ def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
     else:
         semver_groups = semver_match.groups()
 
+    # A final `try` in case the indexing fails
+    try:
+        major, minor, patch = (int(s) for s in semver_groups[2:5])
+    except IndexError:
+        raise ValueError(not_found_error)
+
     # Check the version match groups for >= 0.1.0
     # If this succeeds, return the version string
     # If this fails, abort with the Wrong Version error
     #
     # Note: This is a simple check for now. It should not be interpreted
     # as a caret requirement (as in ^0.1.0)
-    major, minor, patch = (int(s) for s in semver_groups[2:5])
     if major >= 0 and minor >= 1 and patch >= 0:
         return semver_groups[1]
     else:
         raise ValueError(version_error)
 
 
+def get_path(args_path: Optional[str]) -> str:
+    """ Determine the path to `getver` by priority. """
+
+    # Highest priority is given to a path provided on the command line
+    if args_path is not None:
+        return args_path
+
+    # Next priority is given to the `GETVER_PATH` environment variable
+    environ_path: Optional[str]
+    environ_path = environ.get('GETVER_PATH')
+    if environ_path is not None:
+        return environ_path
+
+    # If neither are present, return the bare name. Another function
+    # will test to see if it can be found in the `PATH` environment variable
+    return 'getver'
+
+
 if __name__ == '__main__':
     args: argparse.Namespace = parse_args()
+    #print(args)
 
     # ANSI escape sequence regex from https://stackoverflow.com/a/14693789
     ansi_color_match: Pattern[str]
     ansi_color_match = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
+    # Get a path to the `getver` executable
+    gv_path: str = get_path(args.getver_path)
+
     # Check if `getver` is in PATH or the path provided by -g
-    gv_path = args.getver_path.split(' ')
+    gv_path_list: List[str] = gv_path.split(' ')
     gv_version: str
     try:
-        gv_version = check_version(gv_path, ansi_color_match)
+        gv_version = check_version(gv_path_list, ansi_color_match)
     except ValueError as e:
         print(f'getver-format: error: {e}', file=stderr)
         exit(1)
@@ -234,7 +262,7 @@ if __name__ == '__main__':
 
     # Run `getver` with the cleaned input list and capture the output
     run_command: List[str]
-    run_command = gv_path + list(input_clean.keys())
+    run_command = gv_path_list + list(input_clean.keys())
 
     getver_proc: subprocess.CompletedProcess
     getver_proc = subprocess.run(args = run_command,
@@ -243,7 +271,6 @@ if __name__ == '__main__':
 
     # Clean ANSI color codes from the input for easier formatting
     output_clean: str = ansi_color_match.sub('', getver_proc.stdout)
-
 
     # Parse the cleaned output into "found" and "not found" lists,
     # where "found" contains items of the format `('name', 'version')`
