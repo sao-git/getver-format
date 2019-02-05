@@ -1,6 +1,6 @@
 # getver-format
 
-A wrapper around the excellent Rust tool **[getver](https://github.com/phynalle/getver)** to format output for use in a `Cargo.toml` crate manifest. Written in Python.
+A wrapper around **[getver][getver]**, an excellent tool for [Rust][rust-lang], to format its output for use in a [Cargo manifest][cargo-dependencies]. Written in Python.
 
 `getver` will always pull the latest version number of a crate from [crates.io][crates-io], so this is most useful when adding a new dependency to a project or upgrading a prior dependency.
 
@@ -32,9 +32,23 @@ rayon = "1.0"
 error-chain = "0.12"
 ```
 
+### Sort alphabetically
+
+The output can be sorted alphabetically by adding `-a` or `--sort-alphabet`:
+
+```
+$ python getver-format.py -a toml fomat_macros chrono cached rayon error-chain
+cached = "0.8"
+chrono = "0.4"
+error-chain = "0.12"
+fomat-macros = "0.2"
+rayon = "1.0"
+toml = "0.4"
+```
+
 ### Showing patch version
 
-If you want to show the **[semver][semver]** [patch version][semver-patch] (as in `MAJOR.MINOR.PATCH`) in the output, add `-p` or `--show-patch`:
+If you want the **[SemVer][semver]** [patch version][semver-patch] (as in `MAJOR.MINOR.PATCH`) in the output, add `-p` or `--show-patch`:
 
 ```
 $ python getver-format.py -p toml fomat_macros chrono cached rayon error-chain
@@ -59,6 +73,15 @@ alice
 bob
 ```
 
+### Hide missing crates
+
+Missing crates can be hidden by adding `-n` or `--no-missing-crates`:
+
+```
+$ python getver-format.py bob num alice
+num = "0.2"
+```
+
 ## Help
 
 ### Print help on the console
@@ -67,35 +90,52 @@ Add `-h` or `--help`:
 
 ```
 $ python getver-format.py -h
-usage: getver-format [-h] [-p] CRATE [CRATE ...]
+usage: getver-format [-h] [-V] [-g PATH] [-p] [-n] [-a] CRATE [CRATE ...]
+
+getver-format 0.5.0
+Print a list of the latest Rust crate versions from crates.io
 
 positional arguments:
-  CRATE             a list of Cargo crates
+  CRATE                 a list of Cargo crates
 
 optional arguments:
-  -h, --help        show this help message and exit
-  -p, --show-patch  show semver patch versions
+  -h, --help            show this help message and exit
+  -V, --version         print the program version
+  -g PATH, --getver-path PATH
+                        path to getver
+  -p, --show-patch      show semver patch versions
+  -n, --no-missing-crates
+                        do not show missing crates in the output
+  -a, --sort-alphabet   sort the list of crates alphabetically
 ```
+
+### `getver` is not in the PATH environment variable
+
+Add `-g` or `--getver-path` and specify the path to the `getver` executable. If there are any spaces in the path, they must be escaped with `\`, or the full path must be `"quoted"`.
 
 ### At least one crate name must be given
 
 ```
 $ python getver-format.py
-usage: getver-format [-h] [-p] CRATE [CRATE ...]
+usage: getver-format [-h] [-V] [-g PATH] [-p] [-n] [-a] CRATE [CRATE ...]
 getver-format: error: the following arguments are required: CRATE
 ```
 
 ## Future
 
 Planned additions include:
- * Optional alphabetical sorting for the output
- * Suppressing missing crate warnings if desired
- * Proper changelog as a Markdown file linked from this README 
+ * Optional sorting by version number
+ * Fix output for crates that only are listed on [crates.io][crates-io] with underscores, as using hyphens for these will cause Cargo to fail
+ * Add support for a `GETVER_PATH` environment variable to be checked if `-g` is not given
+ * Proper changelog as a Markdown file linked from this README
 
 ## License
 
 Released under the MIT license.
 
+[getver]: https://github.com/phynalle/getver "getver by phynalle on GitHub"
+[rust-lang]: https://www.rust-lang.org/ "Rust programming language"
+[cargo-dependencies]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-cratesio "The Cargo Book: Specifying dependencies from crates.io"
 [semver]: https://semver.org/ "Semantic Versioning"
 [semver-patch]: https://semver.org/#spec-item-6 "Semantic Versioning Specification, item 6: Patch version"
 [crates-io]: https://crates.io/ "crates.io: The Rust community’s crate registry"
