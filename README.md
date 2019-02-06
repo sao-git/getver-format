@@ -19,7 +19,7 @@ Give a list of crate names on the command line, just like `getver`:
 $ python getver-format.py toml fomat_macros chrono cached rayon error-chain
 ```
 
-A name can be listed with either an underscore or a hyphen, and the output will always use hyphens. The order of the output will match the list given.
+A name can be listed with either an underscore or a hyphen. The output will use the canonical name on [crates.io][crates-io]. The order of the output will match the list given unless you specify a sorting option.
 
 The output is ready to copy and paste into your `Cargo.toml`:
 
@@ -62,7 +62,7 @@ error-chain = "0.12.0"
 
 ### Missing crates
 
-Names that cannot be found on [crates.io][crates-io] are printed to *standard error* in alphabetical order:
+Names that cannot be found on crates.io are printed to *standard error* in alphabetical order:
 
 ```
 $ python getver-format.py bob num alice
@@ -78,7 +78,7 @@ bob
 Missing crates can be hidden by adding `-n` or `--no-missing-crates`:
 
 ```
-$ python getver-format.py bob num alice
+$ python getver-format.py -n bob num alice
 num = "0.2"
 ```
 
@@ -111,7 +111,26 @@ optional arguments:
 
 ### `getver` is not in the PATH environment variable
 
-Add `-g` or `--getver-path` and specify the path to the `getver` executable. If there are any spaces in the path, they must be escaped with `\`, or the full path must be `"quoted"`.
+These must include the full path to getver, *including* the executable name.
+
+#### Set the `GETVER_PATH` environment variable
+
+```
+$ GETVER_PATH="/path/to/getver" python getver-format.py
+```
+
+or
+
+```
+$ export GETVER_PATH="/path/to/getver"
+$ python getver-format.py
+```
+
+#### Specify on the command line
+
+Add `-g` or `--getver-path`. If there are any spaces in the path, they must be escaped with `\`, or the full path must be `"quoted"`.
+
+This will **override** the `GETVER_PATH` variable.
 
 ### At least one crate name must be given
 
@@ -123,11 +142,16 @@ getver-format: error: the following arguments are required: CRATE
 
 ## Future
 
-Planned additions include:
+### Planned additions:
+
  * Optional sorting by version number
- * Fix output for crates that only are listed on [crates.io][crates-io] with underscores, as using hyphens for these will cause Cargo to fail
- * Add support for a `GETVER_PATH` environment variable to be checked if `-g` is not given
+ * Add a `--show-debug-output` switch for printing debugging information
  * Proper changelog as a Markdown file linked from this README
+ * **Testing on Windows:** This program is currently not being tested on Windows, though it *should* run as long as you've built and installed `getver` and it can be found in your `Path`. Specifying the path with `-g` *may* fail because of OS differences.
+
+### Known bugs:
+
+ * If a crate name is given with an underscore and the canonical name on crates.io uses a hyphen, a `KeyError` exception will occur. Likewise, if a crate name is given with a hyphen and the canonical name uses an underscore, the final order may not match the input order.
 
 ## License
 
