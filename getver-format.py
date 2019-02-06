@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __title__ = 'getver-format'
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 __license__ = 'MIT'
 __desc__ = (
     'Formatter for copying latest versions of Rust crates to a Cargo manifest, using "getver" crate version fetcher')
@@ -97,17 +97,18 @@ def get_crate_lists(input_clean: Dict[str, Any],
     # If it doesn't, assume the crate was found and has a corresponding version
     # number and add the number to the corresponding dictionary entry
     crates_not_found: List[str] = []
-
-    for n in split_crates:
-        potential_name: str = n[0]
-        if potential_name.find("doesn't exist") != -1:
-            name_not_found: str = potential_name.split("'")[1]
+    for c in split_crates:
+        name: str = c[0]
+        if name.find("doesn't exist") != -1:
+            name_not_found: str = name.split("'")[1]
             crates_not_found.append(name_not_found)
             del input_clean[name_not_found]
         else:
-            found_version: str = n[1]
-            input_clean[potential_name] = found_version
-
+            version: str = c[1]
+            if name not in input_clean:
+                corrected_name: str = name.replace('_', '-')
+                del input_clean[corrected_name]
+            input_clean[name] = version
 
     # Create the "found" output list and format according to user preferences
     #
@@ -241,7 +242,7 @@ if __name__ == '__main__':
     # Get a path to the `getver` executable
     gv_path: str = get_path(args.getver_path)
 
-    # Check if `getver` is in PATH or the path provided by -g
+    # Check if there's a valid `getver` at the path
     gv_path_list: List[str] = gv_path.split(' ')
     gv_version: str
     try:
@@ -258,7 +259,7 @@ if __name__ == '__main__':
     # This is safe because `input_clean` will not be used after the final
     # lists are created.
     input_clean: Dict[str, Any]
-    input_clean = OrderedDict.fromkeys(s.replace('_', '-') for s in args.crates)
+    input_clean = OrderedDict.fromkeys(args.crates)
 
     # Run `getver` with the cleaned input list and capture the output
     run_command: List[str]
