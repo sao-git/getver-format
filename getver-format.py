@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __title__ = 'getver-format'
-__version__ = '0.5.1'
+__version__ = '0.6.0'
 __license__ = 'MIT'
 __desc__ = (
     'Formatter for copying latest versions of Rust crates to a Cargo manifest, using "getver" crate version fetcher')
@@ -64,29 +64,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_crate_lists(input_clean: Dict[str, Any],
-                    output_clean: str,
-                    sort_alpha: bool,
-                    show_patch: bool) -> Tuple[List, List]:
+def parse_crates(input_clean: Dict[str, Any],
+                 output_clean: str) -> Optional[List]:
     """
-    Parses the output of `getver` into a tuple of two lists:
-
-        The first list contains the found crates, of type `List[Tuple[str, str]]`.
-        The first element in the tuple is the name of the crate,
-        the second element is the latest version number in crates.io
-        This list is sorted according to the input list.
-
-        The second list contains the missing crates, of type `List[str]`.
-        This list is sorted alphabetically.
+    Parses the output of `getver` and returns a list of missing crates,
+    sorted alphabetically. Removes missing crates from input dictionary.
     """
 
-    # Make a list out of the cleaned input, one item for each line
-    raw_crates: Iterable[str] = output_clean.splitlines()
-
-    # Separate found crate strings `'name: version'` into lists `['name', 'version']`
+    # Make a list out of the cleaned output, one item for each line, then
+    # separate found crate strings `'name: version'` into lists `['name', 'version']`
     # Missing crate strings will not be affected
     split_crates: Iterable[List[str]]
-    split_crates = (s.split(': ') for s in raw_crates)
+    split_crates = (s.split(': ') for s in output_clean.splitlines())
 
     # For each item in `split_crates`, attempt to find missing crate strings
     # of the form `"the crate 'crate-not-found' doesn't exist"`, splitting by `'`
@@ -96,6 +85,9 @@ def get_crate_lists(input_clean: Dict[str, Any],
     #
     # If it doesn't, assume the crate was found and has a corresponding version
     # number and add the number to the corresponding dictionary entry
+    #
+    # If the output name is not found in the input dict, replace underscores (U+005F)
+    # in the output name with hyphens (U+002D).
     crates_not_found: List[str] = []
     for c in split_crates:
         name: str = c[0]
@@ -110,23 +102,37 @@ def get_crate_lists(input_clean: Dict[str, Any],
                 del input_clean[corrected_name]
             input_clean[name] = version
 
-    # Create the "found" output list and format according to user preferences
-    #
-    # The default is to remove the SemVer patch version number from the output
-    # and keep the output in the same order as the input
-    crates_found_out: List[Tuple[str, str]]
-    if not show_patch:
-        crates_found_out = [(name, '.'.join(version.split('.')[:2]))
-                for name, version in input_clean.items()]
+    # If no crates were missing (an empty list evaluates to False)
+    if not crates_not_found:
+        return None
+    # Sort the "not found" list alphabetically
     else:
-        crates_found_out = [(name, version)
-                for name, version in input_clean.items()]
+        crates_not_found.sort()
+        return crates_not_found
+
+
+def format_found(crates_found: Dict[str, str],
+                 show_patch: bool,
+                 sort_alpha: bool) -> Optional[Iterable[Tuple[str, str]]]:
+    """ Format the "found" crates into an iterable according to user preferences. """
+
+    # If no crates were found (an empty dict evaluates to False)
+    if not crates_found:
+        return None
+
+    # The default is to remove the SemVer patch version number from the output
+    if not show_patch:
+        for name in crates_found.keys():
+            crates_found[name] = '.'.join(crates_found[name].split('.')[:2])
+
+    name_version_pairs = crates_found.items()
 
     if sort_alpha:
-        crates_found_out.sort(key=lambda crate: crate[0])
-
-
-    return crates_found_out, crates_not_found
+        # Should sort alphabetically by keys
+        return sorted(name_version_pairs)
+    else:
+        # Original OrderedDict order
+        return name_version_pairs
 
 
 def check_version(path: List[str], ansi_pattern: Pattern[str]) -> str:
@@ -247,23 +253,18 @@ if __name__ == '__main__':
     gv_version: str
     try:
         gv_version = check_version(gv_path_list, ansi_color_match)
-    except ValueError as e:
-        print(f'getver-format: error: {e}', file=stderr)
+    except ValueError as err:
+        print(f'getver-format: error: {err}', file=stderr)
         exit(1)
 
-    # Replace underscores (U+005F) in the input list with hyphens (U+002D),
-    # then remove duplicate names from the list and keep the resulting order.
-    #
     # `input_clean` will be mutated in `get_crate_lists()`, which will delete
-    # missing crates from the dict and append version numbers to the found keys.
-    # This is safe because `input_clean` will not be used after the final
-    # lists are created.
-    input_clean: Dict[str, Any]
-    input_clean = OrderedDict.fromkeys(args.crates)
+    # missing crates from the dict and append version numbers to the found crates.
+    input_dict: Dict[str, Any]
+    input_dict = OrderedDict.fromkeys(args.crates)
 
     # Run `getver` with the cleaned input list and capture the output
     run_command: List[str]
-    run_command = gv_path_list + list(input_clean.keys())
+    run_command = gv_path_list + list(input_dict.keys())
 
     getver_proc: subprocess.CompletedProcess
     getver_proc = subprocess.run(args = run_command,
@@ -273,22 +274,28 @@ if __name__ == '__main__':
     # Clean ANSI color codes from the input for easier formatting
     output_clean: str = ansi_color_match.sub('', getver_proc.stdout)
 
-    # Parse the cleaned output into "found" and "not found" lists,
-    # where "found" contains items of the format `('name', 'version')`
-    # and "not found" contains items of the format `'name'`
-    crates_found: List[Tuple[str, str]]
-    crates_not_found: List[str]
-    crates_found, crates_not_found = get_crate_lists(input_clean,
-                                                     output_clean,
-                                                     args.sort_alpha,
-                                                     args.show_patch)
+    # Parse the cleaned output into "found" and "not found".
+    # "found" is the input dictionary with items of the format `'name': 'version'`
+    # and "not found" is a list with items of the format `'name'`.
+    #
+    # "not found" names are removed from the dictionary.
+    #crates_found: List[Tuple[str, str]]
+    crates_not_found: Optional[List[str]]
+    crates_not_found = parse_crates(input_dict, output_clean)
 
-    # These will be used to determine what to output
-    found: bool = len(crates_found) != 0
-    not_found: bool = len(crates_not_found) != 0
+    # Alias the input dictionary to restrict the type declaration
+    found_dict: Dict[str, str] = input_dict
+
+    crates_found: Optional[Iterable[Tuple[str, str]]]
+    crates_found = format_found(found_dict,
+                                args.show_patch,
+                                args.sort_alpha)
+
+    separator = ''
 
     # Print the list of "found" crates
-    if found:
+    if crates_found is not None:
+        separator = '\n'
         # Format "found" crates into a newline-separated string of
         # `name = "version"`
         found_formatted: str = '\n'.join(f'{name} = "{version}"'
@@ -297,13 +304,8 @@ if __name__ == '__main__':
         print(found_formatted)
 
     # Print the list of "not found" crates to stderr in alphabetical order
-    if not args.hide_missing and not_found:
-        crates_not_found.sort()
+    if not args.hide_missing and crates_not_found is not None:
         not_found_formatted: str = '\n'.join(crates_not_found)
 
-        if found:
-            sep = '\n'
-        else:
-            sep = ''
-
-        print(f"{sep}These were not found on crates.io:\n{not_found_formatted}", file=stderr)
+        print(f"{separator}These were not found on crates.io:\n{not_found_formatted}",
+              file=stderr)
